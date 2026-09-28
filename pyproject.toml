@@ -34,3 +34,7 @@ profile = "black"
 
 [tool.black]
 target-version = ["py313"]
+
+[tool.mypy]
+# lerobot and reachy_mini ship no type information
+ignore_missing_imports = true
