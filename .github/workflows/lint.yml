@@ -1,0 +1,19 @@
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv venv --python 3.13
+      - run: uv pip install black isort
+      # --no-project: syncing would pull the robot SDK, which needs cairo.
+      - run: uv run --no-project black --check src tests scripts
+      - run: uv run --no-project isort --check-only src tests scripts

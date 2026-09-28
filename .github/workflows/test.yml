@@ -1,0 +1,23 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      # The tests import the robot SDK: PyGObject builds against cairo and
+      # girepository, and the SDK asks gi for the GStreamer typelibs. LeRobot
+      # encodes episode video with ffmpeg.
+      - run: sudo apt-get update
+      - run: >
+          sudo apt-get install -y libcairo2-dev libgirepository1.0-dev
+          gir1.2-gstreamer-1.0 gir1.2-gst-plugins-base-1.0 ffmpeg
+      - run: uv sync
+      - run: uv run pytest tests -q
