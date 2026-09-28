@@ -64,8 +64,8 @@ State is ordered `body_rotation`, `stewart_1`..`stewart_6`, `right_antenna`,
 `left_antenna`, then `head_x`, `head_y`, `head_z`, `head_roll`, `head_pitch`,
 `head_yaw`. Joints and angles are in radians and positions in metres; the pose
 uses the same convention as the SDK's `create_head_pose` (extrinsic `xyz`
-Euler angles). The antenna order comes from the SDK's `hardware_config.yaml`
-and hasn't been confirmed on a robot yet.
+Euler angles). The antenna order was confirmed on a robot by moving the right
+antenna by hand.
 
 The action is what an app would pass to `set_target`: `head_x`..`head_yaw`,
 `body_rotation`, `right_antenna`, `left_antenna`. Because every action is a
@@ -80,9 +80,10 @@ mixing the two.
 
 ## Status
 
-Short test recordings from a real robot have been read back and look right.
-The antenna order still needs confirming: record while moving one antenna by
-hand and check which state value changes.
+Recordings from a real robot have been read back and look right. Still open:
+whether the head pose includes the body's rotation or is relative to the body,
+which decides whether `body_rotation` adds information to the action. Rotating
+the body by hand while recording and watching `head_yaw` will tell.
 
 ## Checking the Connection
 

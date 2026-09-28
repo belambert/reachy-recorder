@@ -11,7 +11,8 @@ from PIL import Image
 from reachy_mini import ReachyMini
 from reachy_mini.utils.rotation import Rotation
 
-# Order the daemon reports them in, which follows hardware_config.yaml.
+# Order the daemon reports them in, which follows hardware_config.yaml;
+# the antenna order was confirmed by moving one antenna by hand.
 JOINT_NAMES = [
     "body_rotation",
     *(f"stewart_{i}" for i in range(1, 7)),
