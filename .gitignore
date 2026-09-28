@@ -11,3 +11,6 @@ wheels/
 
 # Lock file stays local
 uv.lock
+
+# Local recordings
+data/
