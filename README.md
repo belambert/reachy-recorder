@@ -60,12 +60,30 @@ apps start from.
 | `action`                  | `observation.state` at the next tick                   |
 | `task`                    | The annotator's instruction                            |
 
+State is ordered `body_rotation`, `stewart_1`..`stewart_6`, `right_antenna`,
+`left_antenna`. The antenna order comes from the SDK's `hardware_config.yaml`
+and hasn't been confirmed on a robot yet.
+
+## Status
+
+The recorder hasn't been run against a real robot yet. Before relying on the
+data, make a short recording, move one antenna by hand to confirm the antenna
+order, and inspect the resulting dataset.
+
 ## Checking the Connection
 
 `scripts/probe.py` connects alongside a running app and reports per-second
 frame and state rates, plus reachy-gaze's detection rate:
 
     uv run python scripts/probe.py --host reachy-mini.local --seconds 15
+
+With the control app's camera view closed, it measured a steady 30 fps at 720p
+and state at about 48 Hz. With the view open, the second stream stalled within
+about 6 s and reachy-gaze's detection rate halved.
+
+If the WebRTC stream becomes a problem, a fallback is to record the 640 px
+JPEGs that reachy-gaze already sends to its detector (about 12 Hz), which costs
+the robot nothing extra.
 
 ## Development
 
