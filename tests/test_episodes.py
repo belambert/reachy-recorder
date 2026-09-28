@@ -53,3 +53,12 @@ def test_max_len_splits():
     eps = feed(EpisodeBuilder(1, 2), [step("a", i) for i in range(6)])
     assert [len(e.frames) for e in eps] == [2, 2, 1]
     assert {e.task for e in eps} == {"a"}
+
+
+def test_action_idx_selects_from_next_state():
+    steps = [
+        Step("a", np.zeros((2, 2, 3), np.uint8), np.array([i, 10 * i, 100 * i]))
+        for i in range(2)
+    ]
+    [ep] = feed(EpisodeBuilder(1, 100, [2, 0]), steps)
+    assert ep.frames[0].action.tolist() == [100, 1]

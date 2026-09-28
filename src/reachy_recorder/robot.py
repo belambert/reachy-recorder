@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import numpy as np
 from PIL import Image
 from reachy_mini import ReachyMini
+from reachy_mini.utils.rotation import Rotation
 
 # Order the daemon reports them in, which follows hardware_config.yaml.
 JOINT_NAMES = [
@@ -17,18 +18,23 @@ JOINT_NAMES = [
     "right_antenna",
     "left_antenna",
 ]
+# metres and radians, in create_head_pose's convention
+POSE_NAMES = ["head_x", "head_y", "head_z", "head_roll", "head_pitch", "head_yaw"]
+STATE_NAMES = [*JOINT_NAMES, *POSE_NAMES]
+# what an app commands with set_target: head pose, body yaw and antennas
+ACTION_NAMES = [*POSE_NAMES, "body_rotation", "right_antenna", "left_antenna"]
 
 
 @dataclass
 class Sample:
-    """The latest frame and joint state at one moment."""
+    """The latest frame and robot state at one moment."""
 
     image: np.ndarray  # RGB, resized
-    state: np.ndarray  # float32, in JOINT_NAMES order
+    state: np.ndarray  # float32, in STATE_NAMES order
 
 
 class RobotStream:
-    """Latest camera frame over WebRTC and joint state over the SDK socket.
+    """Latest camera frame over WebRTC; joints and head pose over the SDK socket.
 
     The daemon encodes a separate video stream per viewer, so close the
     control app's camera view while recording: two streams starve each other.
@@ -54,7 +60,8 @@ class RobotStream:
         if frame is None or time.monotonic() - self._frame_at > max_age:
             return None
         head, antennas = self.mini.get_current_joint_positions()
-        state = np.asarray([*head, *antennas], dtype=np.float32)
+        pose = pose_to_xyzrpy(self.mini.get_current_head_pose())
+        state = np.asarray([*head, *antennas, *pose], dtype=np.float32)
         return Sample(to_rgb(frame, self.width), state)
 
     def image_shape(self) -> tuple[int, int, int]:
@@ -83,3 +90,9 @@ def to_rgb(bgr: np.ndarray, width: int) -> np.ndarray:
     if w != width:
         img = img.resize((width, round(h * width / w)), Image.Resampling.BILINEAR)
     return np.asarray(img)
+
+
+def pose_to_xyzrpy(pose: np.ndarray) -> np.ndarray:
+    """A 4x4 head pose as (x, y, z, roll, pitch, yaw), inverting create_head_pose."""
+    rpy = Rotation.from_matrix(pose[:3, :3]).as_euler("xyz")
+    return np.concatenate([pose[:3, 3], rpy])

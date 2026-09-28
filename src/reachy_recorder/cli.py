@@ -14,7 +14,7 @@ import typer
 from reachy_recorder.annotate import Annotator, FixedTask, GazePanel
 from reachy_recorder.dataset import DatasetWriter, features
 from reachy_recorder.episodes import EpisodeBuilder, Step
-from reachy_recorder.robot import JOINT_NAMES, RobotStream
+from reachy_recorder.robot import ACTION_NAMES, STATE_NAMES, RobotStream
 
 app = typer.Typer(add_completion=False)
 logger = logging.getLogger(__name__)
@@ -51,9 +51,13 @@ def record(
     )
     stream = RobotStream(host, width)
     writer = DatasetWriter(
-        repo_id, root, fps, features(stream.image_shape(), JOINT_NAMES)
+        repo_id, root, fps, features(stream.image_shape(), STATE_NAMES, ACTION_NAMES)
     )
-    builder = EpisodeBuilder(round(min_seconds * fps), round(max_seconds * fps))
+    builder = EpisodeBuilder(
+        round(min_seconds * fps),
+        round(max_seconds * fps),
+        [STATE_NAMES.index(n) for n in ACTION_NAMES],
+    )
 
     stop = threading.Event()
     signal.signal(signal.SIGINT, lambda *_: stop.set())

@@ -17,18 +17,33 @@ IMAGE_KEY = "observation.images.head"
 logger = logging.getLogger(__name__)
 
 
-def features(image_shape: tuple[int, int, int], joints: list[str]) -> dict:
-    """LeRobot feature spec: one camera, joint state, and next-state action."""
-    joint = {"dtype": "float32", "shape": (len(joints),), "names": joints}
+def features(
+    image_shape: tuple[int, int, int], state: list[str], action: list[str]
+) -> dict:
+    """LeRobot feature spec: one camera, a state vector, and an action vector."""
+
+    def vector(names: list[str]) -> dict:
+        return {"dtype": "float32", "shape": (len(names),), "names": names}
+
     return {
         IMAGE_KEY: {
             "dtype": "video",
             "shape": image_shape,
             "names": ["height", "width", "channels"],
         },
-        "observation.state": joint,
-        "action": joint,
+        "observation.state": vector(state),
+        "action": vector(action),
     }
+
+
+def check_compatible(existing: dict, new: dict) -> None:
+    """Fail before recording if a resumed dataset has a different layout."""
+    for key in ("observation.state", "action"):
+        if existing[key]["names"] != new[key]["names"]:
+            raise ValueError(
+                f"existing dataset's {key} is {existing[key]['names']}, "
+                f"not {new[key]['names']}; record into a new --root"
+            )
 
 
 class DatasetWriter:
@@ -44,6 +59,7 @@ class DatasetWriter:
         """Open `root` if it already holds a dataset, else create one there."""
         if root is not None and (root / "meta" / "info.json").exists():
             self.ds = LeRobotDataset.resume(repo_id, root=root)
+            check_compatible(self.ds.meta.features, features)
         else:
             self.ds = LeRobotDataset.create(
                 repo_id, fps, features, root=root, robot_type=ROBOT_TYPE
