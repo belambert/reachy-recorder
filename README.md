@@ -67,6 +67,11 @@ uses the same convention as the SDK's `create_head_pose` (extrinsic `xyz`
 Euler angles). The antenna order was confirmed on a robot by moving the right
 antenna by hand.
 
+The head pose is in the world frame: it includes the body's rotation. Turning
+the body by hand moves `head_yaw` by exactly as much as `body_rotation`, while
+the Stewart joints stay still. `body_rotation` in the action therefore tells
+how a turn is split between the body and the head platform.
+
 The action is what an app would pass to `set_target`: `head_x`..`head_yaw`,
 `body_rotation`, `right_antenna`, `left_antenna`. Because every action is a
 subset of the next tick's state, a different action (such as next-tick joints,
@@ -80,10 +85,8 @@ mixing the two.
 
 ## Status
 
-Recordings from a real robot have been read back and look right. Still open:
-whether the head pose includes the body's rotation or is relative to the body,
-which decides whether `body_rotation` adds information to the action. Rotating
-the body by hand while recording and watching `head_yaw` will tell.
+Recordings from a real robot have been read back and look right, and the
+antenna order and head pose frame have been checked by moving the robot by hand.
 
 ## Checking the Connection
 
