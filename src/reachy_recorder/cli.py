@@ -41,7 +41,8 @@ def record(
     private: bool = True,
 ) -> None:
     """Record until Ctrl-C, cutting an episode whenever the task changes."""
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    # force: an imported library has already configured the root logger
+    logging.basicConfig(level=logging.INFO, format="%(message)s", force=True)
     if (task is None) == (not gaze):
         raise typer.BadParameter("pass exactly one of --task or --gaze")
 
