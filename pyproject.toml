@@ -1,0 +1,36 @@
+[project]
+name = "reachy-recorder"
+version = "0.1.0"
+description = "Record a Reachy Mini to a LeRobot dataset, whatever app is driving it"
+readme = "README.md"
+authors = [
+    { name = "Ben Lambert", email = "blambert@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "lerobot[dataset]>=0.6.1",
+    "reachy-mini>=1.11.0",
+    "requests>=2.34.2",
+    "typer>=0.27.2",
+]
+
+[project.scripts]
+reachy-recorder = "reachy_recorder.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.9.3,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "black>=26.5.1",
+    "isort>=9.0.1",
+    "mypy>=2.3.1",
+    "pytest>=9.1.1",
+]
+
+[tool.isort]
+profile = "black"
+
+[tool.black]
+target-version = ["py313"]
