@@ -47,6 +47,10 @@ def record(
         Optional[float],
         typer.Option(help="Split longer episodes; default 30, 120 with --gaze-cycles."),
     ] = None,
+    max_stale_seconds: Annotated[
+        float,
+        typer.Option(help="Reuse a late camera frame up to this old; older is a gap."),
+    ] = 0.5,
     push: Annotated[bool, typer.Option(help="Push to the Hub when done.")] = False,
     private: bool = True,
 ) -> None:
@@ -77,7 +81,7 @@ def record(
     stop = threading.Event()
     signal.signal(signal.SIGINT, lambda *_: stop.set())
     try:
-        run(stream, annotator, builder, writer, fps, stop)
+        run(stream, annotator, builder, writer, fps, max_stale_seconds, stop)
     finally:
         for ep in builder.flush():
             writer.put(ep)
@@ -94,22 +98,25 @@ def run(
     builder: EpisodeBuilder,
     writer: DatasetWriter,
     fps: int,
+    max_stale: float,
     stop: threading.Event,
 ) -> None:
-    """Sample at `fps` on absolute deadlines and hand finished episodes over."""
+    """Sample at `fps` on absolute deadlines and hand finished episodes over.
+
+    A tick whose latest camera frame is up to `max_stale` seconds old keeps it:
+    the state is fresh every tick, and dropping the tick would squeeze time,
+    since LeRobot spaces frames evenly. An older frame means the video stalled.
+    """
     period = 1.0 / fps
-    # older than two ticks means the video stalled; the stream also takes a
-    # couple of seconds to settle after connecting
-    max_age = 2 * period
     next_tick = time.monotonic()
     while not stop.is_set():
-        s = stream.sample(max_age)
+        s = stream.sample(max_stale)
         step = (
             None
             if s is None
             else Step(annotator.task(), s.image, s.state, annotator.segment())
         )
-        for ep in builder.push(step):
+        for ep in builder.push(step, "video stalled"):
             writer.put(ep)
 
         next_tick += period
@@ -117,7 +124,7 @@ def run(
             stop.wait(delay)
         else:
             # fell behind: the missed ticks are a gap, not a burst to catch up
-            for ep in builder.push(None):
+            for ep in builder.push(None, "fell behind"):
                 writer.put(ep)
             next_tick = time.monotonic()
 

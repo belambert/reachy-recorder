@@ -95,5 +95,9 @@ class DatasetWriter:
             self.ds.save_episode()
             self.saved += 1
             logger.info(
-                "saved episode %d: %r, %d frames", self.saved, ep.task, len(ep.frames)
+                "saved episode %d: %r, %d frames, ended: %s",
+                self.saved,
+                ep.task,
+                len(ep.frames),
+                ep.end,
             )

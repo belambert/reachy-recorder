@@ -39,6 +39,31 @@ def test_segment_change_splits_same_task():
     assert [e.segment for e in eps] == [1, 2]
 
 
+def test_end_reasons():
+    b = EpisodeBuilder(1, 3)
+    pushes: list[tuple[Step | None, str]] = [
+        (step("a", 0), ""),
+        (step("b", 1), ""),
+        (step("b", 2), ""),  # ends "a"
+        (None, "video stalled"),  # ends "b"
+        *((step("c", i), "") for i in range(3, 7)),  # third frame hits max
+        (step(None, 7), ""),
+        (step(None, 8), ""),  # ends the "c" started at 6
+        (step("d", 9, 1), ""),
+        (step("d", 10, 2), ""),
+        (step("d", 11, 2), ""),  # ends segment 1
+    ]
+    eps = [ep for s, gap in pushes for ep in b.push(s, gap or "gap")] + b.flush()
+    assert [e.end for e in eps] == [
+        "task changed",
+        "video stalled",
+        "max length",
+        "nothing to record",
+        "new segment",
+        "stopped",
+    ]
+
+
 def test_gap_ends_episode_and_drops_orphan():
     eps = feed(
         EpisodeBuilder(1, 100),

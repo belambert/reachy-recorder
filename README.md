@@ -27,6 +27,14 @@ of instruction ends the episode:
 Nothing is recorded while the annotator has no instruction (e.g. reachy-gaze is
 disabled or its detector is down) or while the video has stalled.
 
+A short video hiccup doesn't end an episode: a tick whose latest camera frame
+is up to `--max-stale-seconds` old (0.5 by default) keeps that frame, since the
+joint state and head pose are fresh every tick. Dropping the tick instead would
+squeeze time, because LeRobot assumes frames are evenly spaced. An older frame
+counts as a stall and ends the episode. Each saved episode is logged with why
+it ended: `task changed`, `new segment`, `video stalled`, `fell behind`,
+`nothing to record`, `max length` or `stopped`.
+
 reachy-gaze runs the head through a look-around cycle: `moving` to a random
 pose, `holding` there, `scanning` for something to look at, then `tracking` it
 until it gets bored, which starts the next cycle. With `--gaze-cycles`, each

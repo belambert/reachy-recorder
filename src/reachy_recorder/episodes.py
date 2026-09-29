@@ -33,6 +33,7 @@ class Episode:
     task: str
     frames: list[Frame] = field(default_factory=list)
     segment: int = 0
+    end: str = ""  # why the episode ended, for the log
 
 
 class EpisodeBuilder:
@@ -56,32 +57,42 @@ class EpisodeBuilder:
         self.episode: Episode | None = None
         self.pending: Step | None = None
 
-    def push(self, step: Step | None) -> list[Episode]:
-        """Add the next tick's step, or None for a gap; return finished episodes."""
+    def push(self, step: Step | None, gap: str = "gap") -> list[Episode]:
+        """Add the next tick's step, or None for a gap; return finished episodes.
+
+        `gap` says why a None step is missing, for the ended episode's log line.
+        """
         done: list[Episode] = []
         prev, self.pending = self.pending, step
 
         # a gap leaves the pending step without a successor, so no action
-        if step is None or prev is None or prev.task is None:
-            return self._close()
+        if step is None or prev is None:
+            return self._close(gap)
+        if prev.task is None:
+            return self._close("nothing to record")
 
-        ep = self.episode
-        if ep is not None and (ep.task, ep.segment) != (prev.task, prev.segment):
-            done += self._close()
+        if (ep := self.episode) is not None:
+            if ep.task != prev.task:
+                done += self._close("task changed")
+            elif ep.segment != prev.segment:
+                done += self._close("new segment")
         if self.episode is None:
             self.episode = Episode(prev.task, segment=prev.segment)
         action = step.state if self.action_idx is None else step.state[self.action_idx]
         self.episode.frames.append(Frame(prev.image, prev.state, action))
 
         if len(self.episode.frames) >= self.max_len:
-            done += self._close()
+            done += self._close("max length")
         return done
 
     def flush(self) -> list[Episode]:
         """Finish whatever is in progress, e.g. on shutdown."""
         self.pending = None
-        return self._close()
+        return self._close("stopped")
 
-    def _close(self) -> list[Episode]:
+    def _close(self, why: str) -> list[Episode]:
         ep, self.episode = self.episode, None
-        return [ep] if ep is not None and len(ep.frames) >= self.min_len else []
+        if ep is None or len(ep.frames) < self.min_len:
+            return []
+        ep.end = why
+        return [ep]
