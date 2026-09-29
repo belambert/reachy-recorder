@@ -1,7 +1,8 @@
 """Sources of the language instruction for each tick.
 
 An annotator answers "what is the robot doing right now?" as an instruction,
-or None when nothing should be recorded. A change of answer ends an episode.
+or None when nothing should be recorded, plus a segment number. A change of
+either ends an episode.
 """
 
 from __future__ import annotations
@@ -17,6 +18,10 @@ class Annotator(Protocol):
 
     def task(self) -> str | None:
         """The instruction for this tick, or None to record nothing."""
+        ...
+
+    def segment(self) -> int:
+        """Which stretch this tick belongs to; a change starts a new episode."""
         ...
 
     def close(self) -> None:
@@ -35,15 +40,38 @@ class FixedTask:
         """The fixed instruction."""
         return self._task
 
+    def segment(self) -> int:
+        """Always the one stretch."""
+        return 0
+
     def close(self) -> None:
         """Nothing to release."""
 
 
+def gaze_running(state: dict | None) -> bool:
+    """Whether reachy-gaze is reachable, enabled, and its detector is up."""
+    return state is not None and state["enabled"] and state["detector_ok"]
+
+
 def gaze_task(state: dict | None) -> str | None:
     """Instruction for one reading of reachy-gaze's control panel."""
-    if state is None or not state["enabled"] or not state["detector_ok"]:
+    if not gaze_running(state):
         return None
+    assert state is not None
     return f"look at the {state['label']}" if state["locked"] else "look around"
+
+
+def cycle_label(state: dict | None, task: str) -> tuple[str | None, int]:
+    """`task` while reachy-gaze searches or tracks, and the cycle it's in.
+
+    Each cycle opens with a scripted move to a random pose and a hold there;
+    those phases are left out, since the camera can't explain them.
+    """
+    if not gaze_running(state):
+        return None, 0
+    assert state is not None
+    looking = state["phase"] in ("scanning", "tracking")
+    return (task if looking else None), state["cycle"]
 
 
 class GazePanel:
@@ -58,14 +86,18 @@ class GazePanel:
         self.url = url
         self.period = period
         self.timeout = timeout
-        self._task: str | None = None
+        self._state: dict | None = None
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._poll, daemon=True)
         self._thread.start()
 
     def task(self) -> str | None:
         """The instruction from the latest poll."""
-        return self._task
+        return gaze_task(self._state)
+
+    def segment(self) -> int:
+        """Always the one stretch: task changes alone split episodes."""
+        return 0
 
     def close(self) -> None:
         """Stop polling."""
@@ -80,5 +112,22 @@ class GazePanel:
                 state = r.json()
             except requests.RequestException:
                 state = None
-            self._task = gaze_task(state)
+            self._state = state
             self._stop.wait(self.period)
+
+
+class GazeCycles(GazePanel):
+    """One episode per reachy-gaze cycle, all with the same instruction."""
+
+    def __init__(self, url: str, task: str, period: float = 0.25) -> None:
+        """Label searching and tracking `task`, splitting on each new cycle."""
+        self.text = task
+        super().__init__(url, period)
+
+    def task(self) -> str | None:
+        """The fixed instruction, or None outside searching and tracking."""
+        return cycle_label(self._state, self.text)[0]
+
+    def segment(self) -> int:
+        """The cycle number, so each cycle is its own episode."""
+        return cycle_label(self._state, self.text)[1]

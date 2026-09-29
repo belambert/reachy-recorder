@@ -18,18 +18,28 @@ outside it, so the recorder uses the position the robot actually reached next.
 An **annotator** supplies the language instruction for each tick, and a change
 of instruction ends the episode:
 
-| Annotator | Instructions                                                    |
-| --------- | --------------------------------------------------------------- |
-| `--task`  | One fixed instruction for the whole session                     |
-| `--gaze`  | Read from reachy-gaze's panel: "look at the cat", "look around" |
+| Annotator       | Instructions                                                    |
+| --------------- | --------------------------------------------------------------- |
+| `--task`        | One fixed instruction for the whole session                     |
+| `--gaze`        | Read from reachy-gaze's panel: "look at the cat", "look around" |
+| `--gaze-cycles` | Always "look around"; one episode per reachy-gaze cycle         |
 
 Nothing is recorded while the annotator has no instruction (e.g. reachy-gaze is
 disabled or its detector is down) or while the video has stalled.
+
+reachy-gaze runs the head through a look-around cycle: `moving` to a random
+pose, `holding` there, `scanning` for something to look at, then `tracking` it
+until it gets bored, which starts the next cycle. With `--gaze-cycles`, each
+episode is the scanning and tracking of one cycle. The move and hold are left
+out, since the camera can't explain them, and a change of the cycle number
+reachy-gaze reports always starts a new episode. Episodes can run up to 120 s
+by default in this mode.
 
 ## Recording
 
     uv sync
     uv run reachy-recorder you/reachy-gaze --gaze
+    uv run reachy-recorder you/reachy-cycles --gaze-cycles --root data/cycles
     uv run reachy-recorder you/reachy-wave --task "wave the antennas" --root data/wave
 
 Press Ctrl-C to stop; queued episodes are saved before it exits. Recording into

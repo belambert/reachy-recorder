@@ -3,8 +3,9 @@ import numpy as np
 from reachy_recorder.episodes import EpisodeBuilder, Step
 
 
-def step(task: str | None, i: int) -> Step:
-    return Step(task, np.full((2, 2, 3), i, np.uint8), np.array([i], np.float32))
+def step(task: str | None, i: int, segment: int = 0) -> Step:
+    img = np.full((2, 2, 3), i, np.uint8)
+    return Step(task, img, np.array([i], np.float32), segment)
 
 
 def feed(b: EpisodeBuilder, steps: list[Step | None]) -> list:
@@ -27,6 +28,15 @@ def test_task_change_splits_and_keeps_continuity():
     # the last "a" step still gets the first "b" state: no time passed between
     assert [f.action[0] for f in eps[0].frames] == [1, 2]
     assert [f.state[0] for f in eps[1].frames] == [2]
+
+
+def test_segment_change_splits_same_task():
+    eps = feed(
+        EpisodeBuilder(1, 100),
+        [step("a", 0, 1), step("a", 1, 1), step("a", 2, 2), step("a", 3, 2)],
+    )
+    assert [[f.state[0] for f in e.frames] for e in eps] == [[0, 1], [2]]
+    assert [e.segment for e in eps] == [1, 2]
 
 
 def test_gap_ends_episode_and_drops_orphan():

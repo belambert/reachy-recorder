@@ -11,10 +11,13 @@ from typing import Annotated, Optional
 
 import typer
 
-from reachy_recorder.annotate import Annotator, FixedTask, GazePanel
+from reachy_recorder.annotate import Annotator, FixedTask, GazeCycles, GazePanel
 from reachy_recorder.dataset import DatasetWriter, features
 from reachy_recorder.episodes import EpisodeBuilder, Step
 from reachy_recorder.robot import ACTION_NAMES, STATE_NAMES, RobotStream
+
+# LeRobot needs a task on every frame; --gaze-cycles gives them all this one
+CYCLE_TASK = "look around"
 
 app = typer.Typer(add_completion=False)
 logger = logging.getLogger(__name__)
@@ -33,21 +36,33 @@ def record(
     gaze: Annotated[
         bool, typer.Option(help="Label episodes from reachy-gaze's panel.")
     ] = False,
+    gaze_cycles: Annotated[
+        bool,
+        typer.Option(help="One unlabelled episode per reachy-gaze look-around cycle."),
+    ] = False,
     fps: int = 10,
     width: Annotated[int, typer.Option(help="Recorded image width.")] = 640,
     min_seconds: float = 1.0,
-    max_seconds: float = 30.0,
+    max_seconds: Annotated[
+        Optional[float],
+        typer.Option(help="Split longer episodes; default 30, 120 with --gaze-cycles."),
+    ] = None,
     push: Annotated[bool, typer.Option(help="Push to the Hub when done.")] = False,
     private: bool = True,
 ) -> None:
     """Record until Ctrl-C, cutting an episode whenever the task changes."""
     # force: an imported library has already configured the root logger
     logging.basicConfig(level=logging.INFO, format="%(message)s", force=True)
-    if (task is None) == (not gaze):
-        raise typer.BadParameter("pass exactly one of --task or --gaze")
+    if (task is not None) + gaze + gaze_cycles != 1:
+        raise typer.BadParameter("pass exactly one of --task, --gaze, --gaze-cycles")
+    if max_seconds is None:
+        max_seconds = 120.0 if gaze_cycles else 30.0
 
+    url = f"http://{host}:8042/state"
     annotator: Annotator = (
-        GazePanel(f"http://{host}:8042/state") if gaze else FixedTask(task or "")
+        GazeCycles(url, CYCLE_TASK)
+        if gaze_cycles
+        else GazePanel(url) if gaze else FixedTask(task or "")
     )
     stream = RobotStream(host, width)
     writer = DatasetWriter(
@@ -89,7 +104,11 @@ def run(
     next_tick = time.monotonic()
     while not stop.is_set():
         s = stream.sample(max_age)
-        step = None if s is None else Step(annotator.task(), s.image, s.state)
+        step = (
+            None
+            if s is None
+            else Step(annotator.task(), s.image, s.state, annotator.segment())
+        )
         for ep in builder.push(step):
             writer.put(ep)
 

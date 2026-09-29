@@ -14,6 +14,7 @@ class Step:
     task: str | None  # None when nothing worth recording is happening
     image: np.ndarray
     state: np.ndarray
+    segment: int = 0  # a change starts a new episode even if the task doesn't
 
 
 @dataclass
@@ -31,6 +32,7 @@ class Episode:
 
     task: str
     frames: list[Frame] = field(default_factory=list)
+    segment: int = 0
 
 
 class EpisodeBuilder:
@@ -63,10 +65,11 @@ class EpisodeBuilder:
         if step is None or prev is None or prev.task is None:
             return self._close()
 
-        if self.episode is not None and self.episode.task != prev.task:
+        ep = self.episode
+        if ep is not None and (ep.task, ep.segment) != (prev.task, prev.segment):
             done += self._close()
         if self.episode is None:
-            self.episode = Episode(prev.task)
+            self.episode = Episode(prev.task, segment=prev.segment)
         action = step.state if self.action_idx is None else step.state[self.action_idx]
         self.episode.frames.append(Frame(prev.image, prev.state, action))
 
