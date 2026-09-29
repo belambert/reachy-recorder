@@ -10,6 +10,7 @@ from reachy_recorder.robot import (
     JOINT_NAMES,
     STATE_NAMES,
     pose_to_xyzrpy,
+    state_at,
     to_rgb,
 )
 
@@ -20,6 +21,15 @@ def test_to_rgb_swaps_channels_and_keeps_aspect():
     rgb = to_rgb(bgr, 640)
     assert rgb.shape == (360, 640, 3)
     assert rgb[0, 0].tolist() == [0, 0, 255]
+
+
+def test_state_at_interpolates():
+    history = [(1.0, np.array([0.0, 10.0])), (2.0, np.array([1.0, 20.0]))]
+    assert state_at(history, 0.5) is None
+    assert state_at(history, 1.0).tolist() == [0.0, 10.0]
+    assert np.allclose(state_at(history, 1.25), [0.25, 12.5])
+    assert state_at(history, 3.0).tolist() == [1.0, 20.0]
+    assert state_at([], 1.0) is None
 
 
 def test_pose_to_xyzrpy_inverts_create_head_pose():

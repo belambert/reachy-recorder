@@ -125,11 +125,15 @@ for 2 s, several times a minute. The recorder raises the buffer to
 and 100 ms also worked but still dropped a few late packets.
 
 The camera image reaches the recorder about 150 ms plus the video buffer (so
-about 350 ms by default) later than the joint state for the same moment. Each
-frame is recorded with the latest state, so the image lags the state by that
-much; the recorder doesn't yet compensate. The delay was measured by lining up
-how much the image changes with how fast the head turns, at 50 and 200 ms
-buffers.
+about 350 ms by default) later than the joint state for the same moment. The
+recorder keeps a second of state history and pairs each frame with the state
+from `--image-delay-ms` before the frame arrived (150 plus the video buffer by
+default), interpolating between the nearest readings. The delay was measured by
+lining up how much the image changes with how fast the head turns, at 50 and
+200 ms buffers. In a recording made with the compensation, image change lines
+up best with head movement in the same tick; before, it lagged by 3 to 4 ticks.
+The 150 ms was measured on one setup, so another computer or network may need a
+different `--image-delay-ms`.
 
 If the WebRTC stream becomes a problem, a fallback is to record the 640 px
 JPEGs that reachy-gaze already sends to its detector (about 12 Hz), which costs
