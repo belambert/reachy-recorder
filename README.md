@@ -56,15 +56,15 @@ Hugging Face Hub when done (private by default).
 
 Before recording:
 
-- **Close the camera view in the Reachy Mini control app.** The daemon encodes
-  a separate stream for each viewer, and two streams starve each other on the
-  robot. The recorder's own stream costs reachy-gaze about 10% of its detection
-  rate.
+- **Quit the Reachy Mini control app.** The daemon encodes a separate stream
+  for each viewer, and a second viewer loads the robot's encoder and the Wi-Fi
+  enough that the recorder's video barely decodes. The recorder's own stream
+  costs reachy-gaze about 10% of its detection rate.
 - **Turn off behaviour the camera can't explain.** For reachy-gaze, raise
   `BORED_AFTER` and `DWELL_MEMORY` so the head doesn't leave a target for
   reasons invisible in the image.
-- **Expect a couple of seconds' warm-up.** The video stalls briefly after
-  connecting; nothing is recorded until it settles.
+- **Expect a few seconds' warm-up.** Nothing is recorded until the video
+  arrives.
 
 Connecting sends the SDK's `automatic_body_yaw` setting (on), which is what
 apps start from.
@@ -116,6 +116,20 @@ frame and state rates, plus reachy-gaze's detection rate:
 With the control app's camera view closed, it measured a steady 30 fps at 720p
 and state at about 48 Hz. With the view open, the second stream stalled within
 about 6 s and reachy-gaze's detection rate halved.
+
+The SDK's WebRTC client buffers only 10 ms of video. Over Wi-Fi, parts of the
+keyframe the robot sends every 2 s arrive later than that and are dropped, and
+the decoder then rejects every frame until the next keyframe: the video freezes
+for 2 s, several times a minute. The recorder raises the buffer to
+`--video-buffer-ms` (200 by default), which removed the freezes in testing; 50
+and 100 ms also worked but still dropped a few late packets.
+
+The camera image reaches the recorder about 150 ms plus the video buffer (so
+about 350 ms by default) later than the joint state for the same moment. Each
+frame is recorded with the latest state, so the image lags the state by that
+much; the recorder doesn't yet compensate. The delay was measured by lining up
+how much the image changes with how fast the head turns, at 50 and 200 ms
+buffers.
 
 If the WebRTC stream becomes a problem, a fallback is to record the 640 px
 JPEGs that reachy-gaze already sends to its detector (about 12 Hz), which costs

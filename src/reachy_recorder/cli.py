@@ -51,6 +51,9 @@ def record(
         float,
         typer.Option(help="Reuse a late camera frame up to this old; older is a gap."),
     ] = 0.5,
+    video_buffer_ms: Annotated[
+        int, typer.Option(help="WebRTC jitter buffer; the SDK's 10 ms freezes video.")
+    ] = 200,
     push: Annotated[bool, typer.Option(help="Push to the Hub when done.")] = False,
     private: bool = True,
 ) -> None:
@@ -68,7 +71,7 @@ def record(
         if gaze_cycles
         else GazePanel(url) if gaze else FixedTask(task or "")
     )
-    stream = RobotStream(host, width)
+    stream = RobotStream(host, width, video_buffer_ms)
     writer = DatasetWriter(
         repo_id, root, fps, features(stream.image_shape(), STATE_NAMES, ACTION_NAMES)
     )

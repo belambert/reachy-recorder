@@ -5,6 +5,7 @@ from __future__ import annotations
 import threading
 import time
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from PIL import Image
@@ -37,13 +38,14 @@ class Sample:
 class RobotStream:
     """Latest camera frame over WebRTC; joints and head pose over the SDK socket.
 
-    The daemon encodes a separate video stream per viewer, so close the
-    control app's camera view while recording: two streams starve each other.
+    The daemon encodes a separate video stream per viewer, so quit the control
+    app while recording: two streams starve each other.
     """
 
-    def __init__(self, host: str, width: int) -> None:
+    def __init__(self, host: str, width: int, video_buffer_ms: int = 200) -> None:
         """Connect to the daemon at `host`; frames are resized to `width`."""
         self.width = width
+        set_video_buffer(video_buffer_ms)
         # the SDK sends automatic_body_yaw on connect; True matches the
         # default every app starts from
         self.mini = ReachyMini(
@@ -82,6 +84,31 @@ class RobotStream:
         while not self._stop.is_set():
             if (frame := self.mini.media.get_frame()) is not None:
                 self._frame, self._frame_at = frame, time.monotonic()
+
+
+def set_video_buffer(ms: int) -> None:
+    """Make the SDK's WebRTC client buffer `ms` of video rather than 10 ms.
+
+    Over Wi-Fi, parts of the keyframe the robot sends every 2 s arrive later
+    than 10 ms. The jitter buffer drops them, and the decoder then rejects every
+    frame until the next keyframe, freezing the video for 2 s.
+    """
+    # imported here so the rest of this module works without GStreamer
+    from reachy_mini.media.webrtc_client_gstreamer import GstWebRTCClient
+
+    # the SDK sets its 10 ms here, whenever a stream arrives
+    original = getattr(GstWebRTCClient, "_sdk_configure_webrtcbin", None)
+    if original is None:
+        original = GstWebRTCClient._configure_webrtcbin
+        GstWebRTCClient._sdk_configure_webrtcbin = original
+
+    def configure(client: Any, webrtcsrc: Any) -> None:
+        original(client, webrtcsrc)
+        for e in client._iterate_gst(webrtcsrc.iterate_recurse()):
+            if (f := e.get_factory()) is not None and f.get_name() == "webrtcbin":
+                e.set_property("latency", ms)
+
+    GstWebRTCClient._configure_webrtcbin = configure
 
 
 def to_rgb(bgr: np.ndarray, width: int) -> np.ndarray:
