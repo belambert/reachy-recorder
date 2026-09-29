@@ -117,7 +117,8 @@ def run(
             stop.wait(delay)
         else:
             # fell behind: the missed ticks are a gap, not a burst to catch up
-            builder.push(None)
+            for ep in builder.push(None):
+                writer.put(ep)
             next_tick = time.monotonic()
 
 
